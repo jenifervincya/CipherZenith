@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import 'send_money_screen.dart';
+import 'history_screen.dart'; 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -55,7 +56,10 @@ class HomeScreen extends StatelessWidget {
                 icon: Icons.send,
                 label: 'Send Money',
                 onTap: () {
-                  // TODO: navigate to Send Money screen (next step)
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SendMoneyScreen()),
+                    );// TODO: navigate to Send Money screen (next step)
                 },
               ),
               const SizedBox(height: 14),
@@ -69,6 +73,10 @@ class HomeScreen extends StatelessWidget {
                 icon: Icons.history,
                 label: 'Transaction History',
                 onTap: () {
+                  Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const HistoryScreen()),
+    );
                   // TODO: navigate to History screen (later step)
                 },
               ),
