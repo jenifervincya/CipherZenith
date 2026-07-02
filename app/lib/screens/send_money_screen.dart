@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'success_screen.dart'; 
+import '../services/api_service.dart';
 
 class SendMoneyScreen extends StatefulWidget {
   const SendMoneyScreen({super.key});
@@ -12,6 +13,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   final TextEditingController _receiverController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   bool _isLoading = false;
+  final ApiService _apiService = ApiService();
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +117,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     );
   }
 
-  void _onSendPressed() {
+  void _onSendPressed() async {
   if (_receiverController.text.isEmpty || _amountController.text.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Please fill in all fields')),
@@ -125,19 +127,35 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
   setState(() => _isLoading = true);
 
-  // Simulate backend processing for now (2 seconds)
-  // TODO: replace with real API call in next step
-  Future.delayed(const Duration(seconds: 2), () {
+  // Step 1: Send transaction to backend
+  final success = await _apiService.sendTransaction(
+    sender: 'Jeni', // hardcoded for demo
+    receiver: _receiverController.text,
+    amount: _amountController.text,
+  );
+
+  if (!success) {
     setState(() => _isLoading = false);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SuccessScreen(
-          receiver: _receiverController.text,
-          amount: _amountController.text,
-        ),
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Transaction failed. Try again.')),
     );
+    return;
+  }
+
+  // Step 2: Listen for WebSocket completion from backend
+  _apiService.listenForCompletion().listen((event) {
+    if (event == 'complete') {
+      setState(() => _isLoading = false);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SuccessScreen(
+            receiver: _receiverController.text,
+            amount: _amountController.text,
+          ),
+        ),
+      );
+    }
   });
 }
 
