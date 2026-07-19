@@ -129,7 +129,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
   // Step 1: Send transaction to backend
   final success = await _apiService.sendTransaction(
-    sender: 'Jeni', // hardcoded for demo
+    sender: 'Jeni',
     receiver: _receiverController.text,
     amount: _amountController.text,
   );
@@ -143,8 +143,8 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   }
 
   // Step 2: Listen for WebSocket completion from backend
-  _apiService.listenForCompletion().listen((event) {
-    if (event == 'complete') {
+  _apiService.listenForCompletion(
+    onComplete: (data) {
       setState(() => _isLoading = false);
       Navigator.push(
         context,
@@ -155,10 +155,9 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
           ),
         ),
       );
-    }
-  });
+    },
+  );
 }
-
   @override
   void dispose() {
     _receiverController.dispose();
