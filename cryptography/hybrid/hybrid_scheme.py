@@ -33,7 +33,7 @@ try:
         _k.generate_keypair()
     LIBOQS_AVAILABLE = True
     print("[HYBRID] Mode: REAL — liboqs available, using genuine Kyber PQC")
-except Exception:
+except BaseException:
     LIBOQS_AVAILABLE = False
     print("[HYBRID] Mode: FALLBACK — liboqs not available, using simulated Kyber")
     print("[HYBRID] Return shapes identical — Jenifer's backend unaffected")
