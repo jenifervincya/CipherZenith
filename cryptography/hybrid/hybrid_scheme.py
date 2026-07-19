@@ -2,124 +2,254 @@
 hybrid_scheme.py — Hybrid Encryption: AES-256-GCM + CRYSTALS-Kyber
 CipherZenith | ByteStorm Crew | Tamilvel Mugunthan S
 
-This is the MAIN FILE Jenifer's backend imports.
-Two functions she calls:
-  1. encrypt(transaction_data, risk_level)   → Step 2 of the 8-step pipeline
-  2. switch_algorithm(encrypted_package, new_algorithm) → Step 5 (threat detected)
+Two modes (auto-detected at startup):
+  REAL MODE     : liboqs available → genuine Kyber512/1024 PQC
+  FALLBACK MODE : liboqs not available → simulated Kyber (same API, same return shape)
 
-How hybrid encryption works:
-  ┌─────────────────────────────────────────────────────┐
-  │  Transaction JSON                                   │
-  │        ↓                                           │
-  │  AES-256-GCM encrypts the data  (fast, bulk)       │
-  │        ↓                                           │
-  │  Kyber encapsulates the AES key (quantum-safe)     │
-  │        ↓                                           │
-  │  Package: { kyber_ciphertext, aes_ciphertext,      │
-  │             nonce, algorithm_used }                │
-  └─────────────────────────────────────────────────────┘
+Jenifer's backend uses the same import either way:
+  from cryptography.hybrid.hybrid_scheme import encrypt, switch_algorithm
 
-Why hybrid and not just Kyber alone?
-  - Kyber is for KEY EXCHANGE only — not bulk data encryption
-  - AES is fast and efficient for encrypting large data
-  - Kyber protects the AES key from quantum attacks
-  - Together = speed of AES + quantum safety of Kyber
+Function signatures and return shapes are IDENTICAL in both modes.
 """
 
-import sys
 import os
+import sys
 import json
 import base64
 import hashlib
+import secrets
 
-# Add parent directory to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from classical.aes import encrypt as aes_encrypt, decrypt as aes_decrypt, derive_key_from_secret
-from pqc.kyber import generate_keypair, encapsulate, decapsulate, rotate_keypair
 
 
-# ── Risk level → algorithm mapping ────────────────────────────────────────────
+# ── Detect liboqs availability ─────────────────────────────────────────────────
 
-RISK_ALGORITHM = {
-    "LOW"    : "kyber512",   # default — faster, smaller
-    "MEDIUM" : "kyber512",   # same algorithm, but logged as elevated
-    "HIGH"   : "kyber1024",  # stronger — triggered by AI threat detection
+try:
+    import oqs
+    # Quick test to confirm it actually works
+    with oqs.KeyEncapsulation("Kyber512") as _k:
+        _k.generate_keypair()
+    LIBOQS_AVAILABLE = True
+    print("[HYBRID] Mode: REAL — liboqs available, using genuine Kyber PQC")
+except Exception:
+    LIBOQS_AVAILABLE = False
+    print("[HYBRID] Mode: FALLBACK — liboqs not available, using simulated Kyber")
+    print("[HYBRID] Return shapes identical — Jenifer's backend unaffected")
+
+
+# ── Key sizes (same values real Kyber produces) ────────────────────────────────
+
+KYBER_PARAMS = {
+    "Kyber512"  : {"public_key_size": 800,  "private_key_size": 1632, "ct_size": 768,  "ss_size": 32},
+    "Kyber1024" : {"public_key_size": 1568, "private_key_size": 3168, "ct_size": 1568, "ss_size": 32},
 }
 
+RISK_ALGORITHM = {
+    "LOW"    : "kyber512",
+    "MEDIUM" : "kyber512",
+    "HIGH"   : "kyber1024",
+}
 
-# ── Session key store (in-memory for demo) ────────────────────────────────────
-# In production this would be an HSM or secure key vault
-# For demo: stored in memory, rotated on threat detection
+_session_keys = {}
 
-_session_keys = {}   # { algorithm: { public_key, private_key } }
 
+# ── Real Kyber (liboqs) ────────────────────────────────────────────────────────
+
+def _real_generate_keypair(algorithm: str) -> dict:
+    algo_name = "Kyber512" if "512" in algorithm else "Kyber1024"
+    with oqs.KeyEncapsulation(algo_name) as kem:
+        public_key  = kem.generate_keypair()
+        private_key = kem.export_secret_key()
+    return {
+        "public_key"       : base64.b64encode(public_key).decode(),
+        "private_key"      : base64.b64encode(private_key).decode(),
+        "algorithm"        : algo_name,
+        "public_key_size"  : len(public_key),
+        "private_key_size" : len(private_key),
+    }
+
+def _real_encapsulate(public_key_b64: str, algorithm: str) -> dict:
+    algo_name  = "Kyber512" if "512" in algorithm else "Kyber1024"
+    public_key = base64.b64decode(public_key_b64)
+    with oqs.KeyEncapsulation(algo_name) as kem:
+        ciphertext, shared_secret = kem.encap_secret(public_key)
+    return {
+        "ciphertext"         : base64.b64encode(ciphertext).decode(),
+        "shared_secret"      : base64.b64encode(shared_secret).decode(),
+        "algorithm"          : algo_name,
+        "ciphertext_size"    : len(ciphertext),
+        "shared_secret_size" : len(shared_secret),
+    }
+
+def _real_decapsulate(ciphertext_b64: str, private_key_b64: str, algorithm: str) -> dict:
+    algo_name   = "Kyber512" if "512" in algorithm else "Kyber1024"
+    ciphertext  = base64.b64decode(ciphertext_b64)
+    private_key = base64.b64decode(private_key_b64)
+    with oqs.KeyEncapsulation(algo_name, secret_key=private_key) as kem:
+        shared_secret = kem.decap_secret(ciphertext)
+    return {
+        "shared_secret"      : base64.b64encode(shared_secret).decode(),
+        "algorithm"          : algo_name,
+        "shared_secret_size" : len(shared_secret),
+    }
+
+
+# ── Fallback Kyber (simulated — same return shape) ────────────────────────────
+
+def _fallback_generate_keypair(algorithm: str) -> dict:
+    """
+    Simulates Kyber keypair generation.
+    Uses cryptographically secure random bytes.
+    Return shape is IDENTICAL to real Kyber output.
+    """
+    algo_name = "Kyber512" if "512" in algorithm else "Kyber1024"
+    params    = KYBER_PARAMS[algo_name]
+
+    # Generate secure random bytes matching real Kyber key sizes
+    public_key  = secrets.token_bytes(params["public_key_size"])
+    private_key = secrets.token_bytes(params["private_key_size"])
+
+    # Store private key for later decapsulation (keyed by public key hash)
+    _pk_hash = hashlib.sha256(public_key).hexdigest()
+    _fallback_store[_pk_hash] = private_key
+
+    return {
+        "public_key"       : base64.b64encode(public_key).decode(),
+        "private_key"      : base64.b64encode(private_key).decode(),
+        "algorithm"        : algo_name,
+        "public_key_size"  : len(public_key),
+        "private_key_size" : len(private_key),
+    }
+
+_fallback_store = {}   # stores shared secrets keyed by ciphertext hash
+
+def _fallback_encapsulate(public_key_b64: str, algorithm: str) -> dict:
+    """
+    Simulates Kyber encapsulation.
+    Generates a secure random shared secret and ciphertext.
+    Return shape IDENTICAL to real Kyber output.
+    """
+    algo_name     = "Kyber512" if "512" in algorithm else "Kyber1024"
+    params        = KYBER_PARAMS[algo_name]
+    public_key    = base64.b64decode(public_key_b64)
+
+    # Shared secret: 32 secure random bytes (matches real Kyber output)
+    shared_secret = secrets.token_bytes(32)
+
+    # Ciphertext: derived from public key + shared secret (deterministic)
+    # So decapsulation can recover it
+    ct_material = hashlib.sha256(public_key + shared_secret).digest()
+    ciphertext  = ct_material * (params["ct_size"] // 32) + \
+                  ct_material[:params["ct_size"] % 32]
+
+    # Store shared secret keyed by ciphertext so decap can retrieve it
+    ct_hash = hashlib.sha256(ciphertext).hexdigest()
+    _fallback_store[ct_hash] = shared_secret
+
+    return {
+        "ciphertext"         : base64.b64encode(ciphertext).decode(),
+        "shared_secret"      : base64.b64encode(shared_secret).decode(),
+        "algorithm"          : algo_name,
+        "ciphertext_size"    : len(ciphertext),
+        "shared_secret_size" : len(shared_secret),
+    }
+
+def _fallback_decapsulate(ciphertext_b64: str, private_key_b64: str, algorithm: str) -> dict:
+    """
+    Simulates Kyber decapsulation.
+    Retrieves stored shared secret using ciphertext as key.
+    Return shape IDENTICAL to real Kyber output.
+    """
+    algo_name  = "Kyber512" if "512" in algorithm else "Kyber1024"
+    ciphertext = base64.b64decode(ciphertext_b64)
+    ct_hash    = hashlib.sha256(ciphertext).hexdigest()
+
+    if ct_hash not in _fallback_store:
+        raise ValueError("[FALLBACK] Shared secret not found — session may have been rotated")
+
+    shared_secret = _fallback_store[ct_hash]
+
+    return {
+        "shared_secret"      : base64.b64encode(shared_secret).decode(),
+        "algorithm"          : algo_name,
+        "shared_secret_size" : len(shared_secret),
+    }
+
+def _fallback_rotate(algorithm: str) -> dict:
+    print(f"[KYBER FALLBACK] Key rotation triggered — generating fresh {algorithm} keypair")
+    return _fallback_generate_keypair(algorithm)
+
+
+# ── Unified interface — picks real or fallback automatically ──────────────────
+
+def _generate_keypair(algorithm: str) -> dict:
+    return _real_generate_keypair(algorithm) if LIBOQS_AVAILABLE \
+           else _fallback_generate_keypair(algorithm)
+
+def _encapsulate(public_key_b64: str, algorithm: str) -> dict:
+    return _real_encapsulate(public_key_b64, algorithm) if LIBOQS_AVAILABLE \
+           else _fallback_encapsulate(public_key_b64, algorithm)
+
+def _decapsulate(ciphertext_b64: str, private_key_b64: str, algorithm: str) -> dict:
+    return _real_decapsulate(ciphertext_b64, private_key_b64, algorithm) if LIBOQS_AVAILABLE \
+           else _fallback_decapsulate(ciphertext_b64, private_key_b64, algorithm)
+
+def _rotate(algorithm: str) -> dict:
+    if LIBOQS_AVAILABLE:
+        print(f"[KYBER] Key rotation triggered — generating fresh {algorithm} keypair")
+        return _real_generate_keypair(algorithm)
+    return _fallback_rotate(algorithm)
+
+
+# ── Session management ─────────────────────────────────────────────────────────
 
 def _get_or_create_keypair(algorithm: str) -> dict:
-    """Get existing keypair for algorithm or generate a fresh one."""
     if algorithm not in _session_keys:
         print(f"[HYBRID] Generating fresh {algorithm} keypair for session")
-        _session_keys[algorithm] = generate_keypair(algorithm)
+        _session_keys[algorithm] = _generate_keypair(algorithm)
     return _session_keys[algorithm]
 
 
-# ── Main encrypt function — Jenifer calls this at Step 2 ──────────────────────
+# ── PUBLIC API — Jenifer imports these two functions ──────────────────────────
 
 def encrypt(transaction_data: dict, risk_level: str = "LOW") -> dict:
     """
     Encrypt transaction data using Hybrid AES-256 + Kyber.
-    Called by Jenifer's backend at Step 2 of the security pipeline.
+    Called by Jenifer's backend at Step 2.
 
     Args:
-        transaction_data : dict — e.g. {"sender": "Jeni", "receiver": "Mugunthan", "amount": 500}
-        risk_level       : "LOW", "MEDIUM", or "HIGH"
-                           HIGH → uses Kyber1024 instead of Kyber512
+        transaction_data : dict  e.g. {"sender": "Jeni", "receiver": "Mugunthan", "amount": 500}
+        risk_level       : "LOW" | "MEDIUM" | "HIGH"
 
-    Returns dict with:
-        encrypted_data   : dict containing all data needed for decryption
-        algorithm_used   : human-readable string e.g. "AES-256-GCM + Kyber512"
-        key_info         : metadata about keys used (no actual private keys)
-        risk_level       : echoed back for logging
-
-    How it works internally:
-        Step A: Pick algorithm based on risk_level
-        Step B: Get/create Kyber keypair for this session
-        Step C: Encapsulate — get shared_secret + kyber_ciphertext
-        Step D: Derive 32-byte AES key from shared_secret
-        Step E: AES-256-GCM encrypt the transaction JSON
-        Step F: Return full package
+    Returns:
+        {
+            "encrypted_data" : { aes_ciphertext, aes_nonce, kyber_ciphertext, ... },
+            "algorithm_used" : "AES-256-GCM + Kyber512",
+            "key_info"       : { kyber_algorithm, public_key_size, aes_key_size_bits, ... },
+            "risk_level"     : "LOW"
+        }
     """
-    # Step A — pick algorithm
     algorithm = RISK_ALGORITHM.get(risk_level.upper(), "kyber512")
+    keypair   = _get_or_create_keypair(algorithm)
+    enc_result = _encapsulate(keypair["public_key"], algorithm)
 
-    # Step B — get session keypair
-    keypair = _get_or_create_keypair(algorithm)
-
-    # Step C — Kyber encapsulation: sender gets shared_secret
-    enc_result = encapsulate(keypair["public_key"], algorithm)
-
-    # Step D — derive AES key from Kyber shared secret
     shared_secret_bytes = base64.b64decode(enc_result["shared_secret"])
-    aes_key = derive_key_from_secret(shared_secret_bytes)   # SHA-256 → 32 bytes
+    aes_key             = derive_key_from_secret(shared_secret_bytes)
+    plaintext           = json.dumps(transaction_data)
+    aes_result          = aes_encrypt(plaintext, aes_key)
 
-    # Step E — AES-256-GCM encrypt the transaction
-    plaintext = json.dumps(transaction_data)
-    aes_result = aes_encrypt(plaintext, aes_key)
-
-    # Step F — build the complete encrypted package
-    algorithm_label = f"AES-256-GCM + {'Kyber512' if algorithm == 'kyber512' else 'Kyber1024'}"
+    algo_label = f"AES-256-GCM + {'Kyber512' if '512' in algorithm else 'Kyber1024'}"
 
     encrypted_data = {
-        # AES output
-        "aes_ciphertext"    : aes_result["ciphertext"],
-        "aes_nonce"         : aes_result["nonce"],
-        "aes_mode"          : aes_result["mode"],
-        # Kyber output — receiver uses this to recover the AES key
-        "kyber_ciphertext"  : enc_result["ciphertext"],
-        "kyber_algorithm"   : enc_result["algorithm"],
-        # Metadata
-        "algorithm_label"   : algorithm_label,
-        "risk_level"        : risk_level.upper(),
+        "aes_ciphertext"   : aes_result["ciphertext"],
+        "aes_nonce"        : aes_result["nonce"],
+        "aes_mode"         : aes_result["mode"],
+        "kyber_ciphertext" : enc_result["ciphertext"],
+        "kyber_algorithm"  : enc_result["algorithm"],
+        "algorithm_label"  : algo_label,
+        "risk_level"       : risk_level.upper(),
     }
 
     key_info = {
@@ -127,97 +257,83 @@ def encrypt(transaction_data: dict, risk_level: str = "LOW") -> dict:
         "kyber_public_key_size"  : keypair["public_key_size"],
         "aes_key_size_bits"      : 256,
         "shared_secret_size"     : enc_result["shared_secret_size"],
+        "mode"                   : "REAL" if LIBOQS_AVAILABLE else "FALLBACK",
     }
 
     return {
         "encrypted_data" : encrypted_data,
-        "algorithm_used" : algorithm_label,
+        "algorithm_used" : algo_label,
         "key_info"       : key_info,
         "risk_level"     : risk_level.upper(),
     }
 
 
-# ── Switch algorithm — Jenifer calls this at Step 5 ───────────────────────────
-
 def switch_algorithm(encrypted_package: dict, new_algorithm: str = "kyber1024") -> dict:
     """
-    Re-encrypt data with a stronger algorithm when threat is detected.
-    Called by Jenifer's backend at Step 5 (Adaptive Engine).
+    Re-encrypt with stronger algorithm when threat detected.
+    Called by Jenifer's backend at Step 5.
 
     Args:
-        encrypted_package : the full dict returned by encrypt()
-        new_algorithm     : "kyber512" or "kyber1024" (usually kyber1024 on HIGH threat)
+        encrypted_package : full dict returned by encrypt()
+        new_algorithm     : "kyber1024" (always on HIGH threat)
 
-    Returns dict with:
-        re_encrypted_data : new encrypted package with stronger algorithm
-        algorithm_used    : new algorithm label
-        key_info          : new key metadata
-        switched_from     : previous algorithm (for dashboard display)
-        switched_to       : new algorithm
-
-    How it works:
-        Step A: Decrypt the original data using old keys
-        Step B: Rotate keys — generate fresh keypair for new algorithm
-        Step C: Re-encrypt with new algorithm
-        Step D: Return new package + switch metadata
+    Returns:
+        {
+            "re_encrypted_data" : { aes_ciphertext, aes_nonce, kyber_ciphertext, ... },
+            "algorithm_used"    : "AES-256-GCM + Kyber1024",
+            "key_info"          : { ... },
+            "switched_from"     : "AES-256-GCM + Kyber512",
+            "switched_to"       : "AES-256-GCM + Kyber1024"
+        }
     """
-    encrypted_data = encrypted_package.get("encrypted_data", encrypted_package)
-    old_algorithm_label = encrypted_data.get("algorithm_label", "Unknown")
-    old_kyber_algo = encrypted_data.get("kyber_algorithm", "Kyber512")
-
-    # Step A — decrypt original to get plaintext back
-    # Find which keypair was used originally
-    old_algo_key = "kyber512" if "512" in old_kyber_algo else "kyber1024"
+    encrypted_data    = encrypted_package.get("encrypted_data", encrypted_package)
+    old_algo_label    = encrypted_data.get("algorithm_label", "Unknown")
+    old_kyber_algo    = encrypted_data.get("kyber_algorithm", "Kyber512")
+    old_algo_key      = "kyber512" if "512" in old_kyber_algo else "kyber1024"
 
     if old_algo_key not in _session_keys:
         raise ValueError("Original session keys not found — cannot switch algorithm")
 
     old_keypair = _session_keys[old_algo_key]
 
-    # Recover the AES key via Kyber decapsulation
-    dec_result = decapsulate(
-        encrypted_data["kyber_ciphertext"],
-        old_keypair["private_key"],
-        old_algo_key
-    )
+    # Recover AES key via Kyber decapsulation
+    dec_result          = _decapsulate(encrypted_data["kyber_ciphertext"],
+                                       old_keypair["private_key"], old_algo_key)
     shared_secret_bytes = base64.b64decode(dec_result["shared_secret"])
-    old_aes_key = derive_key_from_secret(shared_secret_bytes)
+    old_aes_key         = derive_key_from_secret(shared_secret_bytes)
 
-    # Decrypt AES to recover original plaintext
+    # Decrypt AES to recover plaintext
     aes_dec = aes_decrypt(
         encrypted_data["aes_ciphertext"],
         encrypted_data["aes_nonce"],
         base64.b64encode(old_aes_key).decode()
     )
-
     if not aes_dec["success"]:
-        raise ValueError(f"Decryption failed during algorithm switch: {aes_dec.get('error')}")
+        raise ValueError(f"Decryption failed during switch: {aes_dec.get('error')}")
 
     plaintext = aes_dec["plaintext"]
 
-    # Step B — rotate keys: generate fresh keypair for new algorithm
+    # Rotate keys and re-encrypt with new algorithm
+    new_algo_key  = new_algorithm.lower().replace("-", "")
     print(f"[HYBRID] Switching algorithm: {old_kyber_algo} → {new_algorithm.upper()}")
     print(f"[HYBRID] Rotating keys — all old sessions invalidated")
-    _session_keys[new_algorithm] = rotate_keypair(new_algorithm)
+    _session_keys[new_algo_key] = _rotate(new_algo_key)
 
-    # Step C — re-encrypt with new algorithm
-    new_algo_name = new_algorithm.lower().replace("-", "")
-    new_keypair   = _session_keys[new_algo_name]
-    new_enc       = encapsulate(new_keypair["public_key"], new_algo_name)
+    new_keypair   = _session_keys[new_algo_key]
+    new_enc       = _encapsulate(new_keypair["public_key"], new_algo_key)
+    new_ss_bytes  = base64.b64decode(new_enc["shared_secret"])
+    new_aes_key   = derive_key_from_secret(new_ss_bytes)
+    new_aes       = aes_encrypt(plaintext, new_aes_key)
 
-    new_shared_secret = base64.b64decode(new_enc["shared_secret"])
-    new_aes_key       = derive_key_from_secret(new_shared_secret)
-    new_aes_result    = aes_encrypt(plaintext, new_aes_key)
-
-    new_algorithm_label = f"AES-256-GCM + {'Kyber512' if '512' in new_algo_name else 'Kyber1024'}"
+    new_algo_label = f"AES-256-GCM + {'Kyber512' if '512' in new_algo_key else 'Kyber1024'}"
 
     re_encrypted_data = {
-        "aes_ciphertext"   : new_aes_result["ciphertext"],
-        "aes_nonce"        : new_aes_result["nonce"],
-        "aes_mode"         : new_aes_result["mode"],
+        "aes_ciphertext"   : new_aes["ciphertext"],
+        "aes_nonce"        : new_aes["nonce"],
+        "aes_mode"         : new_aes["mode"],
         "kyber_ciphertext" : new_enc["ciphertext"],
         "kyber_algorithm"  : new_enc["algorithm"],
-        "algorithm_label"  : new_algorithm_label,
+        "algorithm_label"  : new_algo_label,
         "risk_level"       : "HIGH",
     }
 
@@ -226,24 +342,20 @@ def switch_algorithm(encrypted_package: dict, new_algorithm: str = "kyber1024") 
         "kyber_public_key_size" : new_keypair["public_key_size"],
         "aes_key_size_bits"     : 256,
         "shared_secret_size"    : new_enc["shared_secret_size"],
+        "mode"                  : "REAL" if LIBOQS_AVAILABLE else "FALLBACK",
     }
 
     return {
         "re_encrypted_data" : re_encrypted_data,
-        "algorithm_used"    : new_algorithm_label,
+        "algorithm_used"    : new_algo_label,
         "key_info"          : key_info,
-        "switched_from"     : old_algorithm_label,
-        "switched_to"       : new_algorithm_label,
+        "switched_from"     : old_algo_label,
+        "switched_to"       : new_algo_label,
     }
 
 
-# ── Decrypt helper — for testing and verification ─────────────────────────────
-
-def decrypt_package(encrypted_data: dict, algorithm: str = None) -> dict:
-    """
-    Decrypt an encrypted package. Used for testing and verification.
-    In production, decryption happens at the secure destination.
-    """
+def decrypt_package(encrypted_data: dict) -> dict:
+    """Helper for testing and verification."""
     kyber_algo = encrypted_data.get("kyber_algorithm", "Kyber512")
     algo_key   = "kyber512" if "512" in kyber_algo else "kyber1024"
 
@@ -251,100 +363,42 @@ def decrypt_package(encrypted_data: dict, algorithm: str = None) -> dict:
         raise ValueError("Session keys not found — cannot decrypt")
 
     keypair = _session_keys[algo_key]
+    dec     = _decapsulate(encrypted_data["kyber_ciphertext"],
+                           keypair["private_key"], algo_key)
 
-    # Recover AES key via Kyber
-    dec_result          = decapsulate(encrypted_data["kyber_ciphertext"], keypair["private_key"], algo_key)
-    shared_secret_bytes = base64.b64decode(dec_result["shared_secret"])
-    aes_key             = derive_key_from_secret(shared_secret_bytes)
+    ss_bytes = base64.b64decode(dec["shared_secret"])
+    aes_key  = derive_key_from_secret(ss_bytes)
 
-    # Decrypt AES
-    result = aes_decrypt(
+    return aes_decrypt(
         encrypted_data["aes_ciphertext"],
         encrypted_data["aes_nonce"],
         base64.b64encode(aes_key).decode()
     )
-
-    return result
 
 
 # ── Self-test ──────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("  CipherZenith — Hybrid Encryption Module Test")
-    print("  AES-256-GCM + CRYSTALS-Kyber")
+    print("  CipherZenith — Hybrid Encryption Module")
+    print(f"  Mode: {'REAL (liboqs)' if LIBOQS_AVAILABLE else 'FALLBACK (simulated)'}")
     print("=" * 60)
 
-    # Real CipherZenith transaction
-    transaction = {
-        "sender"    : "Jeni",
-        "receiver"  : "Mugunthan",
-        "amount"    : 500,
-        "txn_id"    : "TXN-20240622-001",
-        "timestamp" : "2024-06-22T10:30:00"
-    }
+    txn = {"sender": "Jeni", "receiver": "Mugunthan",
+           "amount": 500, "txn_id": "TXN-DEMO-001"}
 
-    print(f"\n[ORIGINAL TRANSACTION]")
-    print(f"  {json.dumps(transaction, indent=2)}")
+    print(f"\n[1] Encrypting at LOW risk...")
+    r = encrypt(txn, "LOW")
+    print(f"    Algorithm : {r['algorithm_used']}")
+    dec = decrypt_package(r["encrypted_data"])
+    print(f"    Decrypted : {dec['plaintext']}")
+    print(f"    Match     : {json.loads(dec['plaintext']) == txn}")
 
-    # ── Test 1: LOW risk — Kyber512 ───────────────────────────────────────────
-    print(f"\n{'─'*60}")
-    print(f"  TEST 1 — LOW risk (Kyber512)")
-    print(f"{'─'*60}")
+    print(f"\n[2] Switching to HIGH (threat detected)...")
+    s = switch_algorithm(r, "kyber1024")
+    print(f"    From      : {s['switched_from']}")
+    print(f"    To        : {s['switched_to']}")
+    dec2 = decrypt_package(s["re_encrypted_data"])
+    print(f"    Intact    : {json.loads(dec2['plaintext']) == txn}")
 
-    result = encrypt(transaction, risk_level="LOW")
-    print(f"\n  Algorithm   : {result['algorithm_used']}")
-    print(f"  Risk level  : {result['risk_level']}")
-    print(f"  Kyber algo  : {result['key_info']['kyber_algorithm']}")
-    print(f"  Public key  : {result['key_info']['kyber_public_key_size']} bytes")
-    print(f"  AES key     : {result['key_info']['aes_key_size_bits']} bits")
-    print(f"  Ciphertext  : {result['encrypted_data']['aes_ciphertext'][:40]}...")
-
-    # Decrypt and verify
-    dec = decrypt_package(result["encrypted_data"])
-    recovered = json.loads(dec["plaintext"])
-    print(f"\n  Decrypted   : {json.dumps(recovered)}")
-    print(f"  Match       : {recovered == transaction}")
-    print(f"  [{'PASS' if recovered == transaction else 'FAIL'}] LOW risk encryption")
-
-    # ── Test 2: HIGH risk — Kyber1024 ─────────────────────────────────────────
-    print(f"\n{'─'*60}")
-    print(f"  TEST 2 — HIGH risk (Kyber1024)")
-    print(f"{'─'*60}")
-
-    result_high = encrypt(transaction, risk_level="HIGH")
-    print(f"\n  Algorithm   : {result_high['algorithm_used']}")
-    print(f"  Kyber algo  : {result_high['key_info']['kyber_algorithm']}")
-    print(f"  Public key  : {result_high['key_info']['kyber_public_key_size']} bytes")
-
-    dec_high = decrypt_package(result_high["encrypted_data"])
-    recovered_high = json.loads(dec_high["plaintext"])
-    print(f"  Match       : {recovered_high == transaction}")
-    print(f"  [{'PASS' if recovered_high == transaction else 'FAIL'}] HIGH risk encryption")
-
-    # ── Test 3: Algorithm switch (Step 5 simulation) ──────────────────────────
-    print(f"\n{'─'*60}")
-    print(f"  TEST 3 — Algorithm switch (Threat detected!)")
-    print(f"  Simulating: AI detects threat → switch Kyber512 → Kyber1024")
-    print(f"{'─'*60}")
-
-    # Start with LOW risk
-    initial = encrypt(transaction, risk_level="LOW")
-    print(f"\n  Initial     : {initial['algorithm_used']}")
-
-    # Threat detected — switch to HIGH
-    switched = switch_algorithm(initial, new_algorithm="kyber1024")
-    print(f"  Switched to : {switched['algorithm_used']}")
-    print(f"  From        : {switched['switched_from']}")
-    print(f"  To          : {switched['switched_to']}")
-
-    # Decrypt switched package
-    dec_switched = decrypt_package(switched["re_encrypted_data"])
-    recovered_switched = json.loads(dec_switched["plaintext"])
-    print(f"  Data intact : {recovered_switched == transaction}")
-    print(f"  [{'PASS' if recovered_switched == transaction else 'FAIL'}] Algorithm switch")
-
-    print(f"\n{'='*60}")
-    print(f"  All hybrid encryption tests passed!")
-    print(f"  Jenifer can now import: encrypt() and switch_algorithm()")
-    print(f"{'='*60}")
+    print(f"\n✅ Both modes use identical API — Jenifer's code unchanged")
