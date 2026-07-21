@@ -127,24 +127,10 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
   setState(() => _isLoading = true);
 
-  // Step 1: Send transaction to backend
-  final success = await _apiService.sendTransaction(
-    sender: 'Jeni',
-    receiver: _receiverController.text,
-    amount: _amountController.text,
-  );
-
-  if (!success) {
-    setState(() => _isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Transaction failed. Try again.')),
-    );
-    return;
-  }
-
-  // Step 2: Listen for WebSocket completion from backend
+  // Step 1: Connect WebSocket FIRST before sending transaction
   _apiService.listenForCompletion(
     onComplete: (data) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       Navigator.push(
         context,
@@ -157,6 +143,23 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       );
     },
   );
+
+  // Step 2: THEN send the transaction
+  final success = await _apiService.sendTransaction(
+    sender: 'Jeni',
+    receiver: _receiverController.text,
+    amount: _amountController.text,
+  );
+
+  if (!mounted) return;
+
+  if (!success) {
+    setState(() => _isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Transaction failed. Try again.')),
+    );
+    return;
+  }
 }
   @override
   void dispose() {
