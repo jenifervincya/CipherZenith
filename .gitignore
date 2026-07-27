@@ -1,14 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
 # Virtual environment
 venv/
-env/
 
-# Python cache
-__pycache__/
-*.pyc
+# VS Code
+.vscode/
 
-# Environment secrets
+# Environment
 .env
-
-# OS junk files
-.DS_Store
-Thumbs.db
