@@ -13,19 +13,15 @@ Function signatures and return shapes are IDENTICAL in both modes.
 """
 
 import os
-
+import sys
 import json
 import base64
 import hashlib
 import secrets
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
-from ..classical.aes import (
-    encrypt as aes_encrypt,
-    decrypt as aes_decrypt,
-    derive_key_from_secret,
-)
+from classical.aes import encrypt as aes_encrypt, decrypt as aes_decrypt, derive_key_from_secret
 
 
 # ── Detect liboqs availability ─────────────────────────────────────────────────
