@@ -3,10 +3,10 @@ from pydantic import BaseModel
 from datetime import datetime
 import uuid
 
-from ai_engine.monitor import analyze_transaction
-from ai_engine.threat_detection import detect_threat
-from ai_engine.adaptive_engine import decide_encryption
-from crypto.hybrid import encrypt, switch_algorithm
+from backend.ai_engine.monitor import analyze_transaction
+from backend.ai_engine.threat_detection import detect_threat
+from backend.ai_engine.adaptive_engine import decide_encryption
+from backend.crypto.hybrid import encrypt, switch_algorithm
 
 app = FastAPI()
 
