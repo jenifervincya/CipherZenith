@@ -21,7 +21,11 @@ import secrets
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from classical.aes import encrypt as aes_encrypt, decrypt as aes_decrypt, derive_key_from_secret
+from cipherzenith_crypto.classical.aes import (
+    encrypt as aes_encrypt,
+    decrypt as aes_decrypt,
+    derive_key_from_secret,
+)
 
 
 # ── Detect liboqs availability ─────────────────────────────────────────────────

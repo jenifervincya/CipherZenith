@@ -18,7 +18,7 @@ PROJECT_CRYPTO = os.path.join(
 
 sys.path.insert(0, PROJECT_CRYPTO)
 
-from classical.aes import (
+from cipherzenith_crypto.classical.aes import (
     encrypt,
     decrypt,
     generate_key,
