@@ -9,7 +9,7 @@ cryptography==49.0.0
 fastapi==0.139.0
 h11==0.16.0
 idna==3.18
-liboqs-python==0.15.0
+liboqs-python==0.16.0
 packaging==26.2
 pycparser==3.0
 pydantic==2.13.4
