@@ -1,4 +1,4 @@
-from ai_engine.monitor import analyze_transaction
+from backend.ai_engine.monitor import analyze_transaction
 
 test_transaction = {
     "sender": "Jeni",

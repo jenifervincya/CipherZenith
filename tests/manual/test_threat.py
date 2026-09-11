@@ -1,4 +1,4 @@
-from ai_engine.threat_detection import detect_threat
+from backend.ai_engine.threat_detection import detect_threat
 
 test_transaction = {
     "sender": "Jeni",
