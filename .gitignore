@@ -11,3 +11,4 @@ venv/
 
 # Environment
 .env
+websocket_test.py
