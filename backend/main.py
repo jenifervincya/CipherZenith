@@ -8,7 +8,21 @@ from backend.ai_engine.threat_detection import detect_threat
 from backend.ai_engine.adaptive_engine import decide_encryption
 from backend.crypto.hybrid import encrypt, switch_algorithm
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://cipherzenith-dashboard.netlify.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class Transaction(BaseModel):
     sender: str
