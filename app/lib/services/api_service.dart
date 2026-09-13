@@ -6,8 +6,8 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 class ApiService {
   // IMPORTANT: Replace with Jeni's current local IP on demo day
   // Run `ipconfig` on Jeni's laptop to get the current address
-  static const String baseUrl = 'http://10.165.165.212:8000';
-  static const String wsUrl = 'ws://10.165.165.212:8000/ws/app';
+  static const String baseUrl = 'https://enviably-dab-progress.ngrok-free.app';
+  static const String wsUrl = 'wss://enviably-dab-progress.ngrok-free.app/ws/app';
 
   Future<bool> sendTransaction({
     required String sender,

@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'package:provider/provider.dart';
+import 'state/app_state.dart';
+import 'screens/fingerprint_screen.dart';
 
 void main() {
-  runApp(const CipherPayApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AppState(),
+      child: const CipherPayApp(),
+    ),
+  );
 }
 
 class CipherPayApp extends StatelessWidget {
@@ -14,17 +21,15 @@ class CipherPayApp extends StatelessWidget {
       title: 'CipherPay',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0D1117),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF22D3EE),
-          secondary: Color(0xFF0EA5E9),
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF2563EB),
+          secondary: Color(0xFF22C55E),
         ),
-        textTheme: const TextTheme(
-          bodyMedium: TextStyle(color: Colors.white),
-        ),
+        fontFamily: 'Sans',
       ),
-      home: const HomeScreen(),
+      home: const FingerprintScreen(),
     );
   }
 }
