@@ -4,10 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class ApiService {
-  // IMPORTANT: Replace with Jeni's current local IP on demo day
-  // Run `ipconfig` on Jeni's laptop to get the current address
-  static const String baseUrl = 'https://enviably-dab-progress.ngrok-free.app';
-  static const String wsUrl = 'wss://enviably-dab-progress.ngrok-free.app/ws/app';
+  static const String baseUrl = 'https://enviably-dab-progress.ngrok-free.dev';
+  static const String wsUrl = 'wss://enviably-dab-progress.ngrok-free.dev/ws/app';
 
   Future<bool> sendTransaction({
     required String sender,
@@ -17,7 +15,10 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/transaction'),
-        headers: {'Content-Type': 'application/json'},
+        headers:{
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
         body: jsonEncode({
           'sender': sender,
           'receiver': receiver,
