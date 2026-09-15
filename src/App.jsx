@@ -4,11 +4,13 @@ import Dashboard from "./pages/Dashboard";
 import { AuthGuard, isAuthenticated } from "../security/auth_guard";
 import { injectCspMetaTag } from "../security/csp_headers";
 
-// DEV ONLY: set a dummy session token so the dashboard is viewable before
-// the real backend login flow exists. Delete this block once Jenifer's
-// auth endpoint is ready and wire up a real login screen instead.
-if (import.meta.env.DEV && !isAuthenticated()) {
-  sessionStorage.setItem("cipherzenith_dashboard_token", "dev-only-placeholder-token-000");
+// TEMPORARY (hackathon demo): set a dummy session token so the dashboard
+// is viewable without a real login flow. This runs in production builds
+// too, on purpose, so the hosted demo URL works for judges without a
+// backend-issued auth token. Replace with a real login screen once
+// Jenifer's auth endpoint exists — do not ship this bypass beyond the demo.
+if (!isAuthenticated()) {
+  sessionStorage.setItem("cipherzenith_dashboard_token", "demo-placeholder-token-000");
 }
 
 export default function App() {

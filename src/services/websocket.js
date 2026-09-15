@@ -5,6 +5,8 @@
 // Message shape: { step, title, status, details, timestamp }
 
 const WS_URL = import.meta.env?.VITE_DASHBOARD_WS_URL || "ws://localhost:8000/ws/dashboard";
+console.log("DEBUG - WS_URL resolved to:", WS_URL);
+console.log("DEBUG - all env vars:", import.meta.env);
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;

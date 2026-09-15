@@ -10,10 +10,10 @@
 export const CSP_DIRECTIVES = {
   "default-src": ["'self'"],
   "script-src": ["'self'"],
-  "style-src": ["'self'", "'unsafe-inline'"], // Tailwind injects inline styles in dev
+  "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Tailwind + Google Fonts stylesheet
   "img-src": ["'self'", "data:"],
   "connect-src": ["'self'", "ws://localhost:8000", "wss://*"], // dashboard + app WebSocket channels
-  "font-src": ["'self'"],
+  "font-src": ["'self'", "https://fonts.gstatic.com"], // Google Fonts font files
   "object-src": ["'none'"],
   "base-uri": ["'self'"],
   "form-action": ["'self'"],
