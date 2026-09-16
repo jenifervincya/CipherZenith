@@ -47,7 +47,15 @@ class ConnectionManager:
 
 
 dashboard_manager = ConnectionManager()
-
+app_manager = ConnectionManager()
+@app.websocket("/ws/app")
+async def websocket_app(websocket: WebSocket):
+    await app_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        app_manager.disconnect(websocket)
 
 def self_heal(threat_found: bool) -> dict:
     if threat_found:
@@ -198,6 +206,11 @@ async def create_transaction(transaction: Transaction):
             "final_encryption": final_algorithm
         },
         "timestamp": datetime.now().isoformat()
+    })
+    await app_manager.broadcast({
+        "status": "complete",
+        "transaction_id": txn_id,
+        "message": "Transaction Secured!"
     })
 
     return {
