@@ -6,7 +6,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 class ApiService {
   static const String baseUrl = 'https://enviably-dab-progress.ngrok-free.dev';
   static const String wsUrl = 'wss://enviably-dab-progress.ngrok-free.dev/ws/app';
-
   Future<bool> sendTransaction({
     required String sender,
     required String receiver,
@@ -15,7 +14,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/transaction'),
-        headers:{
+        headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
         },
@@ -27,7 +26,6 @@ class ApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      print('Transaction POST failed: $e');
       return false;
     }
   }
@@ -36,11 +34,22 @@ class ApiService {
     required Function(Map<String, dynamic> data) onComplete,
   }) {
     final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-    return channel.stream.listen((message) {
-      final data = jsonDecode(message);
-      if (data['status'] == 'complete') {
-        onComplete(data);
-      }
-    });
+    final subscription = channel.stream.listen(
+      (message) {
+        try {
+          final data = jsonDecode(message);
+          if (data['status'] == 'complete') {
+            onComplete(data);
+          }
+        } catch (e) {
+          if (message.toString().contains('complete')) {
+            onComplete({'status': 'complete'});
+          }
+        }
+      },
+      onError: (error) {},
+      onDone: () {},
+    );
+    return subscription;
   }
 }

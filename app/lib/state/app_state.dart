@@ -17,7 +17,7 @@ class Transaction {
 }
 
 class AppState extends ChangeNotifier {
-  double balance = 10000.0;
+  double balance = 25000.0;
   List<Transaction> transactions = [];
 
   void deductBalance(String receiver, double amount) {

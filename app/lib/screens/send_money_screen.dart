@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../services/api_service.dart';
 import 'success_screen.dart';
+import 'upi_pin_screen.dart';
 
 class SendMoneyScreen extends StatefulWidget {
   const SendMoneyScreen({super.key});
@@ -183,32 +184,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // Security badge
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.lock, color: Color(0xFF2563EB), size: 20),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Protected by Quantum-Safe Encryption',
-                            style: TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  
                   const SizedBox(height: 30),
                   // Send button
                   SizedBox(
@@ -251,70 +227,77 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   }
 
   void _onSendPressed() async {
-    if (_receiverController.text.isEmpty || _amountController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
-      return;
-    }
-
-    final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount')),
-      );
-      return;
-    }
-
-    final state = Provider.of<AppState>(context, listen: false);
-    if (amount > state.balance) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Insufficient balance!')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    _apiService.listenForCompletion(
-      onComplete: (data) {
-        if (!mounted) return;
-        // Deduct balance and save transaction
-        state.deductBalance(_receiverController.text, amount);
-        setState(() => _isLoading = false);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SuccessScreen(
-              receiver: _receiverController.text,
-              amount: _amountController.text,
-              transactionId: 'TXN${DateTime.now().millisecondsSinceEpoch}',
-            ),
-          ),
-        );
-      },
+  if (_receiverController.text.isEmpty || _amountController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please fill in all fields')),
     );
+    return;
+  }
 
-    final success = await _apiService.sendTransaction(
-      sender: 'Jeni',
-      receiver: _receiverController.text,
-      amount: _amountController.text,
+  final amount = double.tryParse(_amountController.text);
+  if (amount == null || amount <= 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please enter a valid amount')),
     );
+    return;
+  }
 
-    if (!mounted) return;
+  final state = Provider.of<AppState>(context, listen: false);
+  if (amount > state.balance) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Insufficient balance!')),
+    );
+    return;
+  }
 
-    if (!success) {
+  // Show UPI PIN screen first
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => UpiPinScreen(
+        onSuccess: () {
+          Navigator.pop(context); // close PIN screen
+          _processPayment(amount, state);
+        },
+      ),
+    ),
+  );
+}
+
+void _processPayment(double amount, AppState state) async {
+  setState(() => _isLoading = true);
+
+  _apiService.listenForCompletion(
+    onComplete: (data) {
+      if (!mounted) return;
+      state.deductBalance(_receiverController.text, amount);
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaction failed. Try again.')),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SuccessScreen(
+            receiver: _receiverController.text,
+            amount: _amountController.text,
+            transactionId: data['transaction_id'] ?? 'TXN${DateTime.now().millisecondsSinceEpoch}',
+          ),
+        ),
       );
-    }
-  }
+    },
+  );
 
-  @override
-  void dispose() {
-    _receiverController.dispose();
-    _amountController.dispose();
-    super.dispose();
+  final success = await _apiService.sendTransaction(
+    sender: 'Jeni',
+    receiver: _receiverController.text,
+    amount: _amountController.text,
+  );
+
+  if (!mounted) return;
+
+  if (!success) {
+    setState(() => _isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Transaction failed. Try again.')),
+    );
   }
+}
 }

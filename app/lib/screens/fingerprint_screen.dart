@@ -128,7 +128,7 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          "Verify your identity to access\nQuantum-Safe Payments",
+                          "Verify your identity to access",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -195,15 +195,7 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    "QUANTUM-SAFE ENCRYPTION ACTIVE",
-                    style: TextStyle(
-                      color: Colors.white54,
-                      letterSpacing: 1.4,
-                      fontSize: 11,
-                    ),
-                  ),
+                  
                 ],
               ),
             ),

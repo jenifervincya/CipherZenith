@@ -101,7 +101,7 @@ class SuccessScreen extends StatelessWidget {
                         const Divider(height: 24),
                         _detailRow('Status', '✅ Completed'),
                         const Divider(height: 24),
-                        _detailRow('Security', '🔐 Quantum-Safe'),
+                        _detailRow('Security', '🔐 Secured'),
                       ],
                     ),
                   ),
