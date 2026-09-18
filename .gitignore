@@ -11,3 +11,9 @@ venv/
 
 # Environment
 .env
+
+# OS junk files
+.DS_Store
+Thumbs.db
+
+cryptography/hybrid/liboqs/

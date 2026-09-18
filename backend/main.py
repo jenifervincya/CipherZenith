@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
@@ -9,6 +10,15 @@ from ai_engine.adaptive_engine import decide_encryption
 from crypto.hybrid import encrypt, switch_algorithm
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class Transaction(BaseModel):
     sender: str
@@ -33,6 +43,7 @@ class ConnectionManager:
 
 
 dashboard_manager = ConnectionManager()
+app_manager = ConnectionManager()
 
 
 def self_heal(threat_found: bool) -> dict:
@@ -80,6 +91,16 @@ async def websocket_dashboard(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         dashboard_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/app")
+async def websocket_app(websocket: WebSocket):
+    await app_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        app_manager.disconnect(websocket)
 
 
 @app.post("/api/transaction")
@@ -184,6 +205,14 @@ async def create_transaction(transaction: Transaction):
             "final_encryption": final_algorithm
         },
         "timestamp": datetime.now().isoformat()
+    })
+
+    # Notify the app - clean, minimal, no technical details
+    await app_manager.broadcast({
+        "status": "complete",
+        "transaction_id": txn_id,
+        "receiver": transaction.receiver,
+        "amount": transaction.amount
     })
 
     return {
