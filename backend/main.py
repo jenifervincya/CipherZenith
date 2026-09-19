@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
@@ -8,6 +8,8 @@ from ai_engine.monitor import analyze_transaction
 from ai_engine.threat_detection import detect_threat
 from ai_engine.adaptive_engine import decide_encryption
 from crypto.hybrid import encrypt, switch_algorithm
+from crypto.freshness import check_freshness
+from crypto.signing import verify_signature
 
 app = FastAPI()
 
@@ -24,6 +26,9 @@ class Transaction(BaseModel):
     sender: str
     receiver: str
     amount: float
+    nonce: str | None = None
+    timestamp: float | None = None
+    signature: str | None = None
 
 
 class ConnectionManager:
@@ -106,6 +111,60 @@ async def websocket_app(websocket: WebSocket):
 @app.post("/api/transaction")
 async def create_transaction(transaction: Transaction):
     txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
+
+    signature_check = verify_signature(
+        transaction.sender, transaction.receiver, transaction.amount,
+        transaction.nonce, transaction.timestamp, transaction.signature
+    )
+    if signature_check["status"] == "invalid":
+        threat_type = "Invalid Signature"
+        await dashboard_manager.broadcast({
+            "step": 4,
+            "title": "Threat Detection",
+            "status": "threat_detected",
+            "details": {
+                "threat_found": True,
+                "threat_type": threat_type,
+                "confidence": 100.0,
+                "detected_by": "signature_check",
+                "reason": signature_check["reason"]
+            },
+            "timestamp": datetime.now().isoformat()
+        })
+        raise HTTPException(status_code=401, detail={
+            "status": "transaction_rejected",
+            "transaction_id": txn_id,
+            "threat_type": threat_type,
+            "reason": signature_check["reason"]
+        })
+
+    freshness = check_freshness(transaction.sender, transaction.nonce, transaction.timestamp)
+    if freshness["status"] not in ("fresh", "unchecked"):
+        threat_labels = {
+            "replay": "Replay Attack",
+            "stale": "Stale Timestamp",
+            "invalid": "Malformed Freshness Fields",
+        }
+        threat_type = threat_labels[freshness["status"]]
+        await dashboard_manager.broadcast({
+            "step": 4,
+            "title": "Threat Detection",
+            "status": "threat_detected",
+            "details": {
+                "threat_found": True,
+                "threat_type": threat_type,
+                "confidence": 100.0,
+                "detected_by": "freshness_check",
+                "reason": freshness["reason"]
+            },
+            "timestamp": datetime.now().isoformat()
+        })
+        raise HTTPException(status_code=409, detail={
+            "status": "transaction_rejected",
+            "transaction_id": txn_id,
+            "threat_type": threat_type,
+            "reason": freshness["reason"]
+        })
 
     # Step 1: Transaction Received
     await dashboard_manager.broadcast({

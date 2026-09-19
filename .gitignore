@@ -43,3 +43,6 @@ dist-ssr/
 .netlify
 
 cryptography/hybrid/liboqs/
+
+# Demo signing key (private, never commit)
+tests/manual/.demo_private_key.json
