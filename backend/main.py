@@ -192,7 +192,11 @@ async def create_transaction(transaction: Transaction):
     })
 
     # Step 3: AI Monitoring
-    monitor_result = analyze_transaction(transaction.model_dump())
+    # Layer 2 rules run first, so a flagged transaction cannot teach the model it is normal.
+    rule_result = check_rules(transaction.sender, transaction.receiver, transaction.amount)
+    monitor_result = analyze_transaction(
+        transaction.model_dump(), update_history=not rule_result["threat_found"]
+    )
     await dashboard_manager.broadcast({
         "step": 3,
         "title": "AI Monitoring",
@@ -203,7 +207,6 @@ async def create_transaction(transaction: Transaction):
 
     # Step 4: Threat Detection
     threat_result = detect_threat(transaction.model_dump(), monitor_result["anomaly_score"])
-    rule_result = check_rules(transaction.sender, transaction.receiver, transaction.amount)
     model_reason = threat_result["reason"] if threat_result["threat_found"] else None
     threat_result["rule_flags"] = rule_result["flags"]
     if rule_result["threat_found"]:
