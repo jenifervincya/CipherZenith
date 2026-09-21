@@ -1,7 +1,7 @@
 from models.ml_model import score_transaction
 
 
-def analyze_transaction(transaction: dict) -> dict:
+def analyze_transaction(transaction: dict, update_history: bool = True) -> dict:
     """
     Step 3: score how unusual this transaction is FOR THIS SENDER
     (Isolation Forest on amount, hour of day and the sender's own history).
@@ -9,6 +9,7 @@ def analyze_transaction(transaction: dict) -> dict:
     result = score_transaction(
         sender=transaction.get("sender", "unknown"),
         amount=transaction.get("amount", 0),
+        update_history=update_history,
     )
 
     return {

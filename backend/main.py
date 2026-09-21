@@ -6,6 +6,7 @@ import uuid
 
 from ai_engine.monitor import analyze_transaction
 from ai_engine.threat_detection import detect_threat
+from ai_engine.rules import check_rules
 from ai_engine.adaptive_engine import decide_encryption
 from crypto.hybrid import encrypt, switch_algorithm
 from crypto.freshness import check_freshness
@@ -191,7 +192,11 @@ async def create_transaction(transaction: Transaction):
     })
 
     # Step 3: AI Monitoring
-    monitor_result = analyze_transaction(transaction.model_dump())
+    # Layer 2 rules run first, so a flagged transaction cannot teach the model it is normal.
+    rule_result = check_rules(transaction.sender, transaction.receiver, transaction.amount)
+    monitor_result = analyze_transaction(
+        transaction.model_dump(), update_history=not rule_result["threat_found"]
+    )
     await dashboard_manager.broadcast({
         "step": 3,
         "title": "AI Monitoring",
@@ -202,6 +207,18 @@ async def create_transaction(transaction: Transaction):
 
     # Step 4: Threat Detection
     threat_result = detect_threat(transaction.model_dump(), monitor_result["anomaly_score"])
+    model_reason = threat_result["reason"] if threat_result["threat_found"] else None
+    threat_result["rule_flags"] = rule_result["flags"]
+    if rule_result["threat_found"]:
+        # A crossed threshold is a fact, not a guess, so a rule verdict wins over the model label.
+        reasons = [flag["reason"] for flag in rule_result["flags"]]
+        if model_reason:
+            reasons.append(model_reason)
+        threat_result["threat_found"] = True
+        threat_result["threat_type"] = rule_result["flags"][0]["rule"]
+        threat_result["confidence"] = 100.0
+        threat_result["detected_by"] = "rules"
+        threat_result["reason"] = "; ".join(reasons)
     await dashboard_manager.broadcast({
         "step": 4,
         "title": "Threat Detection",
