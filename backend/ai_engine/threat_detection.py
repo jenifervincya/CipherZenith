@@ -1,29 +1,30 @@
-import random
+from models.ml_model import HIGH_THRESHOLD
 
-FORCE_THREAT_DEMO = False
-
-THREAT_TYPES = ["Replay Attack", "Man-in-the-Middle", "Unusual Access Pattern"]
 
 def detect_threat(transaction: dict, anomaly_score: float) -> dict:
-    if FORCE_THREAT_DEMO:
-        return {
-            "threat_found": True,
-            "threat_type": "Replay Attack",
-            "confidence": 87.0
-        }
+    """
+    Step 4: turn the Step 3 anomaly score into a verdict.
 
-    # Natural mode: higher anomaly score = higher chance of a "threat"
-    threat_found = anomaly_score > 0.7
+    Replay, stale timestamps and forged signatures are rejected earlier, by the
+    freshness and signature checks in main.py. What reaches this step is
+    "behaviour that is unusual for this sender", so that is all we claim.
+    """
+    threat_found = anomaly_score >= HIGH_THRESHOLD
 
     if threat_found:
-        threat_type = random.choice(THREAT_TYPES)
-        confidence = round(random.uniform(75.0, 95.0), 1)
-    else:
-        threat_type = None
-        confidence = round(random.uniform(95.0, 99.9), 1)
+        return {
+            "threat_found": True,
+            "threat_type": "Anomalous Behaviour",
+            # Model risk score as a percentage, not a calibrated probability.
+            "confidence": round(anomaly_score * 100, 1),
+            "detected_by": "anomaly_model",
+            "reason": f"Anomaly score {anomaly_score} reached the HIGH threshold ({HIGH_THRESHOLD})",
+        }
 
     return {
-        "threat_found": threat_found,
-        "threat_type": threat_type,
-        "confidence": confidence
+        "threat_found": False,
+        "threat_type": None,
+        "confidence": round((1 - anomaly_score) * 100, 1),
+        "detected_by": "anomaly_model",
+        "reason": f"Anomaly score {anomaly_score} is below the HIGH threshold ({HIGH_THRESHOLD})",
     }
