@@ -70,18 +70,18 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#05070a] text-white/90">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-lg font-semibold tracking-tight">CipherZenith</h1>
-          <span className="text-xs font-mono text-white/30">Control Center</span>
+      <header className="border-b border-white/5 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-2 sm:gap-3">
+          <h1 className="text-base sm:text-lg font-semibold tracking-tight">CipherZenith</h1>
+          <span className="text-[10px] sm:text-xs font-mono text-white/30">Control Center</span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${STATUS_DOT[connStatus]}`} />
-          <span className="text-xs font-mono text-white/40 uppercase">{connStatus}</span>
+          <span className="text-[10px] sm:text-xs font-mono text-white/40 uppercase">{connStatus}</span>
         </div>
       </header>
 
-      <main className="p-6 grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-4">
+      <main className="p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-3 sm:gap-4">
         <TransactionPanel transaction={transaction} />
 
         <section>
