@@ -1,7 +1,7 @@
 // StepFlow.jsx
 import StepCard from "./StepCard";
 
-const STEP_DEFINITIONS = [
+export const STEP_DEFINITIONS = [
   { step: 1, title: "Transaction Received" },
   { step: 2, title: "Hybrid Encryption" },
   { step: 3, title: "AI Monitoring" },
