@@ -1,8 +1,9 @@
 // Dashboard.jsx
 import { useEffect, useRef, useState } from "react";
-import StepFlow from "../components/StepFlow";
+import StepFlow, { STEP_DEFINITIONS } from "../components/StepFlow";
 import TransactionPanel from "../components/TransactionPanel";
 import SecurityScore from "../components/SecurityScore";
+import CryptoExplorer from "../components/CryptoExplorer";
 import { connectDashboardSocket } from "../services/websocket";
 import { assertCanConnectDashboard } from "../../security/auth_guard";
 
@@ -54,45 +55,88 @@ export default function Dashboard() {
       setSummary(null);
     }
 
-    setStepStates((prev) => ({
-      ...prev,
-      [msg.step]: { status: msg.status, details: msg.details, timestamp: msg.timestamp },
-    }));
+    setStepStates((prev) => {
+      const next = {
+        ...prev,
+        [msg.step]: { status: msg.status, details: msg.details, timestamp: msg.timestamp },
+      };
 
-    if (msg.step === 8 && msg.status === "complete") {
-      setSummary({
-        score: msg.details.security_score ?? msg.details.score,
-        finalEncryption: msg.details.final_encryption ?? msg.details.finalEncryption,
-        totalTimeSeconds: msg.details.total_time ?? msg.details.totalTimeSeconds,
-      });
-    }
+      if (msg.step === 8 && msg.status === "complete") {
+        setSummary({
+          score: msg.details.security_score ?? msg.details.score,
+          finalEncryption: msg.details.final_encryption ?? msg.details.finalEncryption,
+          totalTimeSeconds: msg.details.total_time ?? msg.details.totalTimeSeconds,
+          totalLatencyMs: msg.details.total_latency_ms ?? null,
+          latencyScore: msg.details.latency_score ?? null,
+          stepDurations: computeStepDurations(next),
+        });
+      }
+
+      return next;
+    });
   }
 
   return (
     <div className="min-h-screen bg-[#05070a] text-white/90">
-      <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-lg font-semibold tracking-tight">CipherZenith</h1>
-          <span className="text-xs font-mono text-white/30">Control Center</span>
+      <header className="border-b border-white/5 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img
+            src="/cipherpay-logo.png"
+            alt="CipherPay"
+            className="h-7 w-7 sm:h-8 sm:w-8 rounded-md flex-shrink-0"
+          />
+          <div className="flex items-baseline gap-2 sm:gap-3">
+            <h1 className="text-base sm:text-lg font-semibold tracking-tight">CipherZenith</h1>
+            <span className="text-[10px] sm:text-xs font-mono text-white/30">Dashboard</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${STATUS_DOT[connStatus]}`} />
-          <span className="text-xs font-mono text-white/40 uppercase">{connStatus}</span>
+          <span className="text-[10px] sm:text-xs font-mono text-white/40 uppercase">{connStatus}</span>
         </div>
       </header>
 
-      <main className="p-6 grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-4">
-        <TransactionPanel transaction={transaction} />
+      <main className="p-3 sm:p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-3 sm:gap-4">
+          <TransactionPanel transaction={transaction} />
 
-        <section>
-          <p className="text-[10px] font-mono tracking-wider text-white/30 mb-3">
-            SECURITY PIPELINE — 8 STEPS
-          </p>
-          <StepFlow stepStates={stepStates} />
-        </section>
+          <section>
+            <p className="text-[10px] font-mono tracking-wider text-white/30 mb-3">
+              SECURITY PIPELINE — 8 STEPS &nbsp;
+              <span className="text-white/15">(click a step to explore)</span>
+            </p>
+            <StepFlow stepStates={stepStates} />
+          </section>
 
-        <SecurityScore summary={summary} />
+          <SecurityScore summary={summary} />
+        </div>
+
+        <CryptoExplorer />
       </main>
     </div>
   );
+}
+
+/**
+ * Computes a per-step duration breakdown purely from the timestamps
+ * already carried on every WebSocket message — no backend change needed
+ * for this part. Each step's duration = its own timestamp minus the
+ * previous step's timestamp (step 1's duration is omitted, since there's
+ * no prior step to measure against on the client).
+ */
+function computeStepDurations(stepStates) {
+  const ordered = STEP_DEFINITIONS
+    .map(({ step, title }) => ({ step, title, ts: stepStates[step]?.timestamp }))
+    .filter((s) => s.ts);
+
+  const durations = [];
+  for (let i = 1; i < ordered.length; i++) {
+    const prev = new Date(ordered[i - 1].ts).getTime();
+    const curr = new Date(ordered[i].ts).getTime();
+    const ms = curr - prev;
+    if (Number.isFinite(ms) && ms >= 0) {
+      durations.push({ step: ordered[i].step, title: ordered[i].title, ms });
+    }
+  }
+  return durations;
 }
