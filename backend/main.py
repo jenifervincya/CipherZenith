@@ -6,7 +6,7 @@ import uuid
 from backend.ai_engine.monitor import analyze_transaction
 from backend.ai_engine.threat_detection import detect_threat
 from backend.ai_engine.adaptive_engine import decide_encryption
-from backend.crypto.hybrid import encrypt, switch_algorithm
+from cipherzenith_crypto.hybrid.hybrid_scheme import encrypt, switch_algorithm
 
 from fastapi.middleware.cors import CORSMiddleware
 
