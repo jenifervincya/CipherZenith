@@ -5,10 +5,44 @@ __pycache__/
 
 # Virtual environment
 venv/
-
-# VS Code
-.vscode/
+env/
 
 # Environment
 .env
-websocket_test.py
+
+# OS junk files
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Local Netlify folder
+.netlify
+
+cryptography/hybrid/liboqs/
+
+# Demo signing key (private, never commit)
+tests/manual/.demo_private_key.json
