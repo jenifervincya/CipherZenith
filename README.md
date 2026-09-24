@@ -1,5 +1,3 @@
-Absolutely. Since you’ll add the **8-stage architecture image yourself**, the README should focus on the project purpose, technical highlights, implementation, results, and setup—not duplicate the architecture diagram.
-
 # CIPHERZENITH — Peak Security for a Quantum Future
 
 > **AI-Powered Post-Quantum Secure Transaction System**
@@ -115,19 +113,19 @@ A Flutter-based transaction interface providing secure user authentication and p
 
 ## Security Design Principles
 
-**CONFIDENTIALITY**
+**CONFIDENTIALITY** - 
 Protect sensitive transaction data using authenticated encryption.
 
-**AUTHENTICITY**
+**AUTHENTICITY** - 
 Verify transaction integrity and identity using post-quantum signatures.
 
-**ADAPTABILITY**
+**ADAPTABILITY** - 
 Adjust security mechanisms according to detected transaction risk.
 
-**RESILIENCE**
+**RESILIENCE** - 
 Support automated key rotation and threat-response mechanisms.
 
-**QUANTUM READINESS**
+**QUANTUM READINESS** - 
 Integrate post-quantum cryptographic primitives into the transaction workflow.
 
 ---
@@ -158,32 +156,6 @@ The modular design provides a foundation that can be extended beyond payments to
 **Track:** `IEngage`
 
 ---
-
-## Project Structure
-
-```text
-CIPHERZENITH/
-│
-├── backend/
-│   └── FastAPI backend & security services
-│
-├── cryptography/
-│   └── AES-256-GCM, ML-KEM & ML-DSA
-│
-├── ai/
-│   └── Anomaly detection & risk analysis
-│
-├── dashboard/
-│   └── React security operations dashboard
-│
-├── mobile/
-│   └── CipherPay Flutter application
-│
-├── tests/
-│   └── Cryptography & system validation
-│
-└── README.md
-```
 
 ## Future Scope
 
