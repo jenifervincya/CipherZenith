@@ -49,7 +49,7 @@ cryptographic protection, AI-based monitoring, threat detection, adaptive
 security, self-healing mechanisms, secure transmission, and protected output.
 
 <p align="center">
-  <img src="assets/flowchart.png"
+  <img src="assets/Flowchart.png"
        alt="CipherZenith 8-Stage Security Architecture"
        width="100%">
 </p>
