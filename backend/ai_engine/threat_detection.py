@@ -1,4 +1,4 @@
-from models.ml_model import HIGH_THRESHOLD
+from backend.models.ml_model import HIGH_THRESHOLD
 
 
 def detect_threat(transaction: dict, anomaly_score: float) -> dict:

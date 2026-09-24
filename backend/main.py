@@ -11,7 +11,18 @@ from cipherzenith_crypto.hybrid.hybrid_scheme import encrypt, switch_algorithm
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+from backend.models.ml_model import _update_history, _train
 
+@app.on_event("startup")
+async def preseed_history():
+    """Pre-seed sender history so demo works from first transaction."""
+    _train()  # train model first
+    for _ in range(5):
+        _update_history("Jeni", 500)
+        _update_history("Mugunthan", 500)
+        _update_history("Trishna", 500)
+        _update_history("Mohamed", 500)
+    print("[DEMO] Sender history pre-seeded — ready for demo")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -44,7 +55,6 @@ class ConnectionManager:
     async def broadcast(self, message: dict):
         for connection in self.active_connections:
             await connection.send_json(message)
-
 
 dashboard_manager = ConnectionManager()
 app_manager = ConnectionManager()

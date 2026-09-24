@@ -1,4 +1,4 @@
-from models.ml_model import score_transaction
+from backend.models.ml_model import score_transaction
 
 
 def analyze_transaction(transaction: dict, update_history: bool = True) -> dict:
