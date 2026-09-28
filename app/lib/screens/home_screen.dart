@@ -65,10 +65,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  '🔐 Quantum-Safe Protected',
-                  style: TextStyle(color: Colors.white60, fontSize: 12),
-                ),
+                
               ],
             ),
           ),

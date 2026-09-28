@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
+import 'pin_setup_screen.dart';
+import 'pin_login_screen.dart';
 
 class FingerprintScreen extends StatefulWidget {
   const FingerprintScreen({super.key});
@@ -13,6 +16,12 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
   final LocalAuthentication _auth = LocalAuthentication();
   bool _isVerifying = false;
   String _status = "Place your finger on the scanner";
+
+  @override
+  void initState() {
+    super.initState();
+    _startVerification();
+  }
 
   Future<void> _startVerification() async {
     if (_isVerifying) return;
@@ -27,10 +36,7 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
       final bool isSupported = await _auth.isDeviceSupported();
 
       if (!canCheck && !isSupported) {
-        setState(() {
-          _isVerifying = false;
-          _status = "Biometric not available on this device";
-        });
+        _goToPin();
         return;
       }
 
@@ -49,26 +55,37 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
           _isVerifying = false;
           _status = "Identity verified!";
         });
-
         await Future.delayed(const Duration(milliseconds: 600));
-
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else {
-        setState(() {
-          _isVerifying = false;
-          _status = "Authentication failed. Try again.";
-        });
+        _goToPin();
       }
     } catch (e) {
-      if (!mounted) return;
-  // On web/chrome, biometrics not supported — skip to home
+      _goToPin();
+    }
+  }
+
+  Future<void> _goToPin() async {
+    if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    final savedPin = prefs.getString('app_pin');
+
+    if (!mounted) return;
+    if (savedPin == null) {
+      // First time — set up PIN
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const PinSetupScreen()),
+      );
+    } else {
+      // PIN exists — ask for it
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PinLoginScreen()),
       );
     }
   }
@@ -111,15 +128,11 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
                               colors: [Color(0xFF22D3EE), Color(0xFF0EA5E9)],
                             ),
                           ),
-                          child: const Icon(
-                            Icons.shield_outlined,
-                            size: 40,
-                            color: Colors.white,
-                          ),
+                          child: const Icon(Icons.shield_outlined, size: 40, color: Colors.white),
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          "CipherPay",
+                          'CipherPay',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
@@ -128,12 +141,9 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          "Verify your identity to access",
+                          'Verify your identity to access\nsecure payments',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
+                          style: TextStyle(fontSize: 14, color: Colors.white70),
                         ),
                         const SizedBox(height: 30),
                         Container(
@@ -142,31 +152,19 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: const Color(0xFF1A1A2E),
-                            border: Border.all(
-                              color: const Color(0xFF22D3EE),
-                              width: 2,
-                            ),
+                            border: Border.all(color: const Color(0xFF22D3EE), width: 2),
                           ),
                           child: Center(
                             child: _isVerifying
-                                ? const CircularProgressIndicator(
-                                    color: Color(0xFF22D3EE),
-                                  )
-                                : const Icon(
-                                    Icons.fingerprint,
-                                    size: 100,
-                                    color: Color(0xFF22D3EE),
-                                  ),
+                                ? const CircularProgressIndicator(color: Color(0xFF22D3EE))
+                                : const Icon(Icons.fingerprint, size: 100, color: Color(0xFF22D3EE)),
                           ),
                         ),
                         const SizedBox(height: 24),
                         Text(
                           _status,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.white70,
-                          ),
+                          style: const TextStyle(fontSize: 15, color: Colors.white70),
                         ),
                         const SizedBox(height: 28),
                         SizedBox(
@@ -176,26 +174,30 @@ class _FingerprintScreenState extends State<FingerprintScreen> {
                             onPressed: _isVerifying ? null : _startVerification,
                             icon: const Icon(Icons.fingerprint, color: Colors.white),
                             label: const Text(
-                              "Verify Identity",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                              'Verify Identity',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF22D3EE),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        GestureDetector(
+                          onTap: _goToPin,
+                          child: const Text(
+                            'Use PIN instead',
+                            style: TextStyle(
+                              color: Color(0xFF22D3EE),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  
                 ],
               ),
             ),
