@@ -172,3 +172,9 @@ The modular design provides a foundation that can be extended beyond payments to
 
 
 
+
+## Dataset attribution
+
+The anomaly model in `backend/training/` was trained on a sample of the PaySim synthetic financial dataset (Lopez-Rojas et al.), downloaded from Kaggle and licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+Changes made: sampled about 200k normal rows; features used were amount and transaction type only. The raw CSV is not included in this repository; download it from Kaggle into `backend/data/paysim.csv` and run `python backend/training/train_model.py` to rebuild the model.
+Evaluation on PaySim `isFraud` labels: AUC 0.784. The model is a secondary, display-only score; the per-sender model in `ml_model.py` makes the risk decisions.
