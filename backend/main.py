@@ -7,7 +7,7 @@ from backend.ai_engine.monitor import analyze_transaction
 from backend.ai_engine.threat_detection import detect_threat
 from backend.ai_engine.adaptive_engine import decide_encryption
 from cipherzenith_crypto.hybrid.hybrid_scheme import encrypt, switch_algorithm
-
+from backend.ai_engine.paysim_scorer import paysim_score
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -148,7 +148,7 @@ async def create_transaction(transaction: Transaction):
         "step": 3,
         "title": "AI Monitoring",
         "status": "complete",
-        "details": monitor_result,
+        "details": {**monitor_result, **paysim_score(transaction.amount)},
         "timestamp": datetime.now().isoformat()
     })
 

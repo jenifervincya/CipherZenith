@@ -46,3 +46,5 @@ cryptography/hybrid/liboqs/
 
 # Demo signing key (private, never commit)
 tests/manual/.demo_private_key.json
+# Datasets (large, CC BY-SA, download separately)
+backend/data/
